@@ -5,7 +5,7 @@ import { sendMail } from "../utils/sendMail.js";
 import crypto from "crypto";
 // Send Token
 
-export const signUp = async (req, res, next) => {
+export const signUp = async (req, res) => {
   try {
     const salt = bcrypt.genSaltSync(10);
     const hashPassword = bcrypt.hashSync(req.body.password, salt);
@@ -13,18 +13,14 @@ export const signUp = async (req, res, next) => {
     const newUser = new User({ ...req.body, password: hashPassword });
 
     await newUser.save();
-    const token = jwt.sign({ id: newUser.id }, process.env.JWT_SECRET);
     res
-      .cookie("access_token", token, {
-        httpOnly: true,
-      })
       .status(200)
-      .json({ success: true, user: newUser });
+      .json({ success: true, message: "User has been created successfully" });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
-export const signIn = async (req, res, next) => {
+export const signIn = async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
@@ -55,7 +51,7 @@ export const signIn = async (req, res, next) => {
         httpOnly: true,
       })
       .status(200)
-      .json({ success: true, user: others });
+      .json({ success: true, data: others });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
@@ -134,6 +130,35 @@ export const resetPassword = async (req, res) => {
       data: "Password Update Success",
       token,
     });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const googleAuth = async (req, res) => {
+  try {
+    const user = await User.findOne({ email: req.body.email });
+    if (user) {
+      const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET);
+      res
+        .cookie("access_token", token, {
+          httpOnly: true,
+        })
+        .status(200)
+        .json({ success: true, data: user._doc });
+    } else {
+      const newUser = new User({ ...req.body, formGoogle: true });
+      const savedUser = await newUser.save();
+
+      const token = jwt.sign({ id: savedUser._id }, process.env.JWT_SECRET);
+
+      res
+        .cookie("access_token", token, {
+          httpOnly: true,
+        })
+        .status(200)
+        .json({ success: true, data: savedUser._doc });
+    }
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }

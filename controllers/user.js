@@ -1,3 +1,4 @@
+import Post from "../models/Post.js";
 import User from "../models/User.js";
 
 export const getAllUsers = async (req, res) => {
@@ -23,37 +24,31 @@ export const getSingleUser = async (req, res) => {
 
 export const updateUser = async (req, res) => {
   try {
-    const user = await User.findById(req.body.userId);
-    if (req.params.id !== req.body.uderId && user.isAdmin === false) {
-      return res
-        .status(404)
-        .json({ message: "You can update only your account." });
+    const activeUser = await User.findById(req.user.id);
+    if (req.params.id === req.user.id || activeUser.isAdmin) {
+      const updatedUser = await User.findByIdAndUpdate(
+        req.params.id,
+        {
+          $set: req.body,
+        },
+        {
+          new: true,
+        }
+      );
+      res.status(200).json({ success: true, data: updatedUser });
+    } else {
+      res
+        .status(500)
+        .json({ success: false, message: "You can update only your account" });
     }
-
-    if (req.body.password) {
-      const salt = await bcrypt.genSalt(10);
-      req.body.password = await bcrypt.hash(req.body.password, salt);
-    }
-    const updatedUser = await User.findOneAndUpdate(
-      req.params.id,
-      {
-        $set: req.body,
-      },
-      { new: true }
-    );
-    res.status(200).json({
-      success: true,
-      message: "User updated successfully",
-      data: updatedUser,
-    });
   } catch (error) {
     res.status(404).send({ sccess: false, message: error.message });
   }
 };
 export const deleteUser = async (req, res) => {
   try {
-    const user = await User.findById(req.body.userId);
-    if (req.params.id !== req.body.uderId && user.isAdmin === false) {
+    const user = await User.findById(req.user.id);
+    if (req.params.id !== req.user.id && user.isAdmin === false) {
       return res
         .status(404)
         .json({ message: "You can update only your account." });
@@ -65,5 +60,32 @@ export const deleteUser = async (req, res) => {
       .json({ message: "User deleted successfully.", success: true });
   } catch (error) {
     res.status(404).send({ sccess: false, message: error.message });
+  }
+};
+export const likePost = async (req, res) => {
+  try {
+    const id = req.user.id;
+    const postId = req.params.postId;
+
+    await Post.findByIdAndUpdate(postId, {
+      $addToSet: { likes: id },
+      pull: { dislies: id },
+    });
+    res.status(200).json({ message: "The post has been Liked" });
+  } catch (error) {
+    res.status(404).json({ success: false, messagel: error.message });
+  }
+};
+export const dislikePost = async (req, res, next) => {
+  try {
+    const id = req.user.id;
+    const postId = req.params.postId;
+    await Post.findByIdAndUpdate(postId, {
+      $addToSet: { dislikes: id },
+      $pull: { likes: id },
+    });
+    res.status(200).json({ message: "The post has been disLiked" });
+  } catch (error) {
+    res.status(404).json({ success: false, messagel: error.message });
   }
 };
